@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VATSIM Gate Management API</title>
+<style>
+  body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:#0b0f14;color:#e8edf2;padding:40px 20px;}
+  .wrap{max-width:720px;margin:0 auto;}
+  h1{color:#3fa9f5;font-size:24px;}
+  h2{color:#3fa9f5;font-size:16px;margin-top:32px;}
+  code, .code-block{background:#161d27;border:1px solid #232c37;border-radius:6px;padding:2px 8px;font-family:Consolas,monospace;color:#8fd3ff;}
+  .code-block{display:block;padding:14px;white-space:pre-wrap;margin:10px 0;font-size:13px;}
+  a{color:#3fa9f5;}
+  .badge{display:inline-block;background:#3fd68a33;color:#3fd68a;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:bold;}
+  .note{color:#8b98a5;font-size:13px;line-height:1.6;}
+  ul{color:#e8edf2;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="badge">API ONLINE</span>
+  <h1>VATSIM Gate Management</h1>
+  <p class="note">This project has no visual homepage — it's a single API endpoint that overlays live VATSIM aircraft positions onto real airport gate maps (pulled live from OpenStreetMap) to infer gate occupancy.</p>
+
+  <h2>Endpoint</h2>
+  <div class="code-block">GET /api/gates?lat={airport_lat}&lon={airport_lon}</div>
+
+  <h2>Try it now (Frankfurt / EDDF)</h2>
+  <p><a href="/api/gates?lat=50.0333&lon=8.5706" target="_blank">/api/gates?lat=50.0333&lon=8.5706</a></p>
+
+  <h2>Response fields</h2>
+  <ul>
+    <li><code>gate</code> — gate/stand identifier (from OpenStreetMap)</li>
+    <li><code>status</code> — "available", "occupied", or "unverified"</li>
+    <li><code>confidence</code> — null, "low", "medium", or "high" (never treated as ground truth)</li>
+    <li><code>callsign</code> / <code>aircraft</code> — the live VATSIM flight matched to that gate, if any</li>
+  </ul>
+
+  <h2>Known limitations</h2>
+  <p class="note">VATSIM has no gate field — occupancy is inferred via position matching, not received as fact. OSM gate coverage varies by airport. Multi-poll confidence requires persisted state across requests, which is limited on serverless — see the repo README for details.</p>
+
+  <p class="note">Source: <a href="https://github.com/AddisenK/VATSIM-Gate-Management">github.com/AddisenK/VATSIM-Gate-Management</a> — MIT licensed, open source.</p>
+</div>
+</body>
+</html>
