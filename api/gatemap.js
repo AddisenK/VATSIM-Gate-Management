@@ -3,11 +3,12 @@
  * ----------------------------------------------------------------
  * Returns the gate/parking-position map for the airport nearest the
  * requested coordinates. Sydney (YSSY), Singapore Changi (WSSS),
- * London Heathrow (EGLL), and JFK (KJFK) now serve curated lists
- * instead of OSM/Overpass data. YSSY/WSSS/EGLL are official AIP chart
- * data; KJFK is community-derived (FlightGear ground-network file) --
- * see lib/kjfk-gates.js for that caveat. Every other airport still
- * uses the live OSM lookup via lib/vatsim-gate-puller.js.
+ * London Heathrow (EGLL), JFK (KJFK), and Paris CDG (LFPG) now serve
+ * curated lists instead of OSM/Overpass data. YSSY/WSSS/EGLL/LFPG are
+ * official AIP chart data; KJFK is community-derived -- see
+ * lib/kjfk-gates.js and lib/lfpg-gates.js for source caveats (LFPG is
+ * also only ~63% complete -- see that file's header). Every other
+ * airport still uses the live OSM lookup via lib/vatsim-gate-puller.js.
  */
 
 const { fetchAirportGates } = require("../lib/vatsim-gate-puller");
@@ -15,12 +16,14 @@ const { YSSY_GATES } = require("../lib/yssy-gates");
 const { WSSS_GATES } = require("../lib/wsss-gates");
 const { EGLL_GATES } = require("../lib/egll-gates");
 const { KJFK_GATES } = require("../lib/kjfk-gates");
+const { LFPG_GATES } = require("../lib/lfpg-gates");
 
 const CURATED_AIRPORTS = [
   { center: { lat: -33.9461, lon: 151.1772 }, radiusDeg: 0.12, gates: YSSY_GATES, source: "chart" },
   { center: { lat: 1.3644, lon: 103.9915 }, radiusDeg: 0.12, gates: WSSS_GATES, source: "chart" },
   { center: { lat: 51.4700, lon: -0.4543 }, radiusDeg: 0.12, gates: EGLL_GATES, source: "chart" },
   { center: { lat: 40.6413, lon: -73.7781 }, radiusDeg: 0.14, gates: KJFK_GATES, source: "community" },
+  { center: { lat: 49.0097, lon: 2.5479 }, radiusDeg: 0.15, gates: LFPG_GATES, source: "chart_partial" },
 ];
 
 function findCuratedAirport(lat, lon) {
