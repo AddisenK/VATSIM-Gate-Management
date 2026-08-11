@@ -15,7 +15,8 @@
   header h1{margin:0;font-size:18px;letter-spacing:1px;}
   header h1 span{color:var(--accent);}
   .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-  .controls input{width:110px;padding:6px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;}
+  .controls select{padding:6px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;}
+  .controls input{width:100px;padding:6px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;}
   .controls button{padding:6px 14px;background:var(--accent);border:none;border-radius:6px;color:#0b0f14;font-weight:bold;cursor:pointer;font-size:13px;}
   .controls button:hover{background:#5cb8ff;}
   .controls button:disabled{opacity:.5;cursor:not-allowed;}
@@ -43,8 +44,13 @@
 <header>
   <h1>VATSIM <span>Gate Map</span></h1>
   <div class="controls">
-    <input type="text" id="lat" value="50.0333" placeholder="lat">
-    <input type="text" id="lon" value="8.5706" placeholder="lon">
+    <select id="airportPreset" onchange="onPresetChange()">
+      <option value="EDDF">EDDF — Frankfurt</option>
+      <option value="YSSY">YSSY — Sydney</option>
+      <option value="custom">Custom coordinates...</option>
+    </select>
+    <input type="text" id="lat" value="50.0333" placeholder="lat" style="display:none;">
+    <input type="text" id="lon" value="8.5706" placeholder="lon" style="display:none;">
     <button id="loadBtn" onclick="loadGates(true)">Load Gates</button>
     <div class="countdown" id="countdown">Auto-refresh in <b>15</b>s</div>
   </div>
@@ -58,11 +64,16 @@
   <div class="row"><span class="dot orange"></span> Unverified (low confidence)</div>
 </div>
 
-<div class="status-bar" id="statusBar">Enter an airport lat/lon and click "Load Gates".</div>
+<div class="status-bar" id="statusBar">Select an airport and click "Load Gates".</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-let map = L.map('map', { zoomControl: true }).setView([50.0333, 8.5706], 15);
+const AIRPORTS = {
+  EDDF: { lat: 50.0333, lon: 8.5706, zoom: 15 },
+  YSSY: { lat: -33.9399, lon: 151.1753, zoom: 14 },
+};
+
+let map = L.map('map', { zoomControl: true }).setView([AIRPORTS.EDDF.lat, AIRPORTS.EDDF.lon], AIRPORTS.EDDF.zoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19
@@ -73,6 +84,23 @@ let refreshTimer = null;
 let countdownTimer = null;
 let secondsLeft = 15;
 const REFRESH_INTERVAL_S = 15;
+
+function onPresetChange(){
+  const preset = document.getElementById('airportPreset').value;
+  const latInput = document.getElementById('lat');
+  const lonInput = document.getElementById('lon');
+  if(preset === 'custom'){
+    latInput.style.display = 'inline-block';
+    lonInput.style.display = 'inline-block';
+    return;
+  }
+  latInput.style.display = 'none';
+  lonInput.style.display = 'none';
+  const a = AIRPORTS[preset];
+  latInput.value = a.lat;
+  lonInput.value = a.lon;
+  loadGates(true, a.zoom);
+}
 
 function clearMarkers(){
   markers.forEach(m => map.removeLayer(m));
@@ -109,7 +137,7 @@ function scheduleAutoRefresh(){
   startCountdown();
 }
 
-async function loadGates(recenter){
+async function loadGates(recenter, zoomOverride){
   const lat = parseFloat(document.getElementById('lat').value);
   const lon = parseFloat(document.getElementById('lon').value);
   const btn = document.getElementById('loadBtn');
@@ -135,7 +163,7 @@ async function loadGates(recenter){
     }
 
     clearMarkers();
-    if(recenter) map.setView([lat, lon], 15);
+    if(recenter) map.setView([lat, lon], zoomOverride || 15);
 
     let occCount = 0, unvCount = 0;
     data.gates.forEach(g => {
@@ -171,7 +199,7 @@ async function loadGates(recenter){
   scheduleAutoRefresh();
 }
 
-loadGates(true);
+loadGates(true, AIRPORTS.EDDF.zoom);
 </script>
 
 </body>
