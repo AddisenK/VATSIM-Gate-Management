@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/gatemap.js": { "maxDuration": 30 },
+    "api/occupancy.js": { "maxDuration": 15 },
+    "api/gates.js": { "maxDuration": 30 }
+  }
+}

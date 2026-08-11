@@ -1,17 +1,16 @@
 /**
  * api/gatemap.js
  * ----------------------------------------------------------------
- * Returns ONLY the airport's gate positions. Now issues a SINGLE combined
- * Overpass query (see lib/vatsim-gate-puller.js) instead of 3 separate
- * requests, to stay well within serverless function execution limits.
+ * Returns ONLY the airport's gate positions via a single combined Overpass
+ * query. maxDuration is configured via vercel.json (functions.api/gatemap.js)
+ * rather than a module.exports.config property, since that property may not
+ * be picked up by Vercel's build system for plain Node.js functions.
  *
  * Usage: GET /api/gatemap?lat=50.0333&lon=8.5706
  * Response: { gates: [{ code, lat, lon }, ...] }
  */
 
 const { fetchAirportGates } = require("../lib/vatsim-gate-puller");
-
-module.exports.config = { maxDuration: 30 };
 
 module.exports = async (req, res) => {
   const { lat, lon } = req.query;
