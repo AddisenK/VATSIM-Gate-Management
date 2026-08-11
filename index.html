@@ -14,12 +14,6 @@
   header{background:linear-gradient(90deg,#0d1420,#131a26);padding:14px 20px;border-bottom:2px solid var(--accent);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
   header h1{margin:0;font-size:18px;letter-spacing:1px;}
   header h1 span{color:var(--accent);}
-  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-  .controls select{padding:6px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;}
-  .controls input{width:100px;padding:6px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;}
-  .controls button{padding:6px 14px;background:var(--accent);border:none;border-radius:6px;color:#0b0f14;font-weight:bold;cursor:pointer;font-size:13px;}
-  .controls button:hover{background:#5cb8ff;}
-  .controls button:disabled{opacity:.5;cursor:not-allowed;}
   .countdown{font-size:12px;color:var(--muted);padding:6px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;}
   .countdown b{color:var(--accent);}
   #map{position:absolute;top:56px;left:0;right:0;bottom:0;}
@@ -29,7 +23,8 @@
   .dot.green{background:var(--green);}
   .dot.red{background:var(--red);}
   .dot.orange{background:var(--accent2);}
-  .status-bar{position:absolute;top:66px;right:16px;background:rgba(18,24,32,0.92);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--muted);z-index:1000;max-width:280px;}
+  .status-bar{position:absolute;top:66px;right:16px;background:rgba(18,24,32,0.92);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--muted);z-index:1000;max-width:300px;}
+  .hint{position:absolute;top:66px;left:16px;background:rgba(18,24,32,0.92);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--muted);z-index:1000;max-width:260px;}
   .spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
   @keyframes spin{to{transform:rotate(360deg);}}
   .leaflet-popup-content-wrapper{background:#161d27;color:#e8edf2;border-radius:8px;}
@@ -43,20 +38,12 @@
 
 <header>
   <h1>VATSIM <span>Gate Map</span></h1>
-  <div class="controls">
-    <select id="airportPreset" onchange="onPresetChange()">
-      <option value="EDDF">EDDF — Frankfurt</option>
-      <option value="YSSY">YSSY — Sydney</option>
-      <option value="custom">Custom coordinates...</option>
-    </select>
-    <input type="text" id="lat" value="50.0333" placeholder="lat" style="display:none;">
-    <input type="text" id="lon" value="8.5706" placeholder="lon" style="display:none;">
-    <button id="loadBtn" onclick="loadGates(true)">Load Gates</button>
-    <div class="countdown" id="countdown">Auto-refresh in <b>15</b>s</div>
-  </div>
+  <div class="countdown" id="countdown">Pan/zoom to an airport to load gates</div>
 </header>
 
 <div id="map"></div>
+
+<div class="hint" id="hintBox">Zoom in on any airport (zoom level 12+) — gates for that area load automatically as you move the map. No preset needed.</div>
 
 <div class="legend">
   <div class="row"><span class="dot green"></span> Available</div>
@@ -64,16 +51,14 @@
   <div class="row"><span class="dot orange"></span> Unverified (low confidence)</div>
 </div>
 
-<div class="status-bar" id="statusBar">Select an airport and click "Load Gates".</div>
+<div class="status-bar" id="statusBar">Zoom in on an airport to begin.</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const AIRPORTS = {
-  EDDF: { lat: 50.0333, lon: 8.5706, zoom: 15 },
-  YSSY: { lat: -33.9399, lon: 151.1753, zoom: 14 },
-};
+const MIN_ZOOM_FOR_GATES = 12;
+const REFRESH_INTERVAL_S = 15;
 
-let map = L.map('map', { zoomControl: true }).setView([AIRPORTS.EDDF.lat, AIRPORTS.EDDF.lon], AIRPORTS.EDDF.zoom);
+let map = L.map('map', { zoomControl: true }).setView([50.0333, 8.5706], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19
@@ -82,25 +67,9 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let markers = [];
 let refreshTimer = null;
 let countdownTimer = null;
-let secondsLeft = 15;
-const REFRESH_INTERVAL_S = 15;
-
-function onPresetChange(){
-  const preset = document.getElementById('airportPreset').value;
-  const latInput = document.getElementById('lat');
-  const lonInput = document.getElementById('lon');
-  if(preset === 'custom'){
-    latInput.style.display = 'inline-block';
-    lonInput.style.display = 'inline-block';
-    return;
-  }
-  latInput.style.display = 'none';
-  lonInput.style.display = 'none';
-  const a = AIRPORTS[preset];
-  latInput.value = a.lat;
-  lonInput.value = a.lon;
-  loadGates(true, a.zoom);
-}
+let secondsLeft = REFRESH_INTERVAL_S;
+let moveDebounce = null;
+let lastLoadedCenter = null;
 
 function clearMarkers(){
   markers.forEach(m => map.removeLayer(m));
@@ -133,22 +102,14 @@ function startCountdown(){
 
 function scheduleAutoRefresh(){
   if(refreshTimer) clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(() => loadGates(false), REFRESH_INTERVAL_S * 1000);
+  refreshTimer = setTimeout(() => {
+    if(lastLoadedCenter) loadGates(lastLoadedCenter.lat, lastLoadedCenter.lon);
+  }, REFRESH_INTERVAL_S * 1000);
   startCountdown();
 }
 
-async function loadGates(recenter, zoomOverride){
-  const lat = parseFloat(document.getElementById('lat').value);
-  const lon = parseFloat(document.getElementById('lon').value);
-  const btn = document.getElementById('loadBtn');
+async function loadGates(lat, lon){
   const status = document.getElementById('statusBar');
-
-  if(Number.isNaN(lat) || Number.isNaN(lon)){
-    status.textContent = 'Please enter valid numeric lat/lon.';
-    return;
-  }
-
-  btn.disabled = true;
   status.innerHTML = '<span class="spinner"></span> Fetching live gate map + VATSIM traffic...';
 
   try{
@@ -156,14 +117,13 @@ async function loadGates(recenter, zoomOverride){
     const data = await res.json();
 
     if(data.error){
-      status.textContent = 'Error: ' + data.error + ' (will retry automatically on next refresh)';
-      btn.disabled = false;
+      status.textContent = 'Error: ' + data.error + ' (will retry automatically)';
       scheduleAutoRefresh();
       return;
     }
 
     clearMarkers();
-    if(recenter) map.setView([lat, lon], zoomOverride || 15);
+    lastLoadedCenter = { lat, lon };
 
     let occCount = 0, unvCount = 0;
     data.gates.forEach(g => {
@@ -188,18 +148,44 @@ async function loadGates(recenter, zoomOverride){
       markers.push(marker);
     });
 
-    status.innerHTML = `Loaded <b>${data.gateCount}</b> gates near (${lat}, ${lon}) — ` +
-      `<span style="color:#f5546c;">${occCount} occupied</span>, ` +
-      `<span style="color:#f5a83f;">${unvCount} unverified</span>, ` +
-      `${data.gateCount - occCount - unvCount} available. Polled at ${new Date(data.polledAt).toLocaleTimeString()}.`;
+    if(data.gateCount === 0){
+      status.textContent = 'No labeled gates found in OSM near this location — try a different area or airport.';
+    } else {
+      status.innerHTML = `Loaded <b>${data.gateCount}</b> gates — ` +
+        `<span style="color:#f5546c;">${occCount} occupied</span>, ` +
+        `<span style="color:#f5a83f;">${unvCount} unverified</span>, ` +
+        `${data.gateCount - occCount - unvCount} available. Polled at ${new Date(data.polledAt).toLocaleTimeString()}.`;
+    }
   } catch(err){
     status.textContent = 'Request failed: ' + err.message + ' (will retry automatically)';
   }
-  btn.disabled = false;
   scheduleAutoRefresh();
 }
 
-loadGates(true, AIRPORTS.EDDF.zoom);
+function onMapSettled(){
+  const zoom = map.getZoom();
+  const status = document.getElementById('statusBar');
+  const hint = document.getElementById('hintBox');
+
+  if(zoom < MIN_ZOOM_FOR_GATES){
+    status.textContent = `Zoom in further to load gates (current zoom ${zoom}, need ${MIN_ZOOM_FOR_GATES}+).`;
+    hint.style.display = 'block';
+    if(refreshTimer) clearTimeout(refreshTimer);
+    if(countdownTimer) clearInterval(countdownTimer);
+    document.getElementById('countdown').textContent = 'Zoom in to load gates';
+    return;
+  }
+  hint.style.display = 'none';
+  const center = map.getCenter();
+  loadGates(center.lat.toFixed(5), center.lng.toFixed(5));
+}
+
+map.on('moveend zoomend', () => {
+  if(moveDebounce) clearTimeout(moveDebounce);
+  moveDebounce = setTimeout(onMapSettled, 900);
+});
+
+onMapSettled();
 </script>
 
 </body>
