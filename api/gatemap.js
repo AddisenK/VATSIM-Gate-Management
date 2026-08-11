@@ -2,19 +2,22 @@
  * api/gatemap.js
  * ----------------------------------------------------------------
  * Returns the gate/parking-position map for the airport nearest the
- * requested coordinates. Sydney (YSSY) and Singapore Changi (WSSS) now
- * serve curated, chart-accurate lists instead of OSM/Overpass data —
- * see lib/yssy-gates.js and lib/wsss-gates.js for why. Every other
+ * requested coordinates. Sydney (YSSY), Singapore Changi (WSSS), and
+ * London Heathrow (EGLL) now serve curated, chart-accurate lists
+ * instead of OSM/Overpass data — see lib/yssy-gates.js,
+ * lib/wsss-gates.js, and lib/egll-gates.js for why. Every other
  * airport still uses the live OSM lookup via lib/vatsim-gate-puller.js.
  */
 
 const { fetchAirportGates } = require("../lib/vatsim-gate-puller");
 const { YSSY_GATES } = require("../lib/yssy-gates");
 const { WSSS_GATES } = require("../lib/wsss-gates");
+const { EGLL_GATES } = require("../lib/egll-gates");
 
 const CURATED_AIRPORTS = [
   { center: { lat: -33.9461, lon: 151.1772 }, radiusDeg: 0.12, gates: YSSY_GATES },
   { center: { lat: 1.3644, lon: 103.9915 }, radiusDeg: 0.12, gates: WSSS_GATES },
+  { center: { lat: 51.4700, lon: -0.4543 }, radiusDeg: 0.12, gates: EGLL_GATES },
 ];
 
 function findCuratedGates(lat, lon) {
@@ -42,7 +45,9 @@ module.exports = async function handler(req, res) {
     const curated = findCuratedGates(lat, lon);
     let gates;
     if (curated) {
-      gates = curated.map((g) => ({ code: g.code, lat: g.lat, lon: g.lon, source: "chart" }));
+      gates = curated
+        .filter((g) => g.lat != null && g.lon != null)
+        .map((g) => ({ code: g.code, lat: g.lat, lon: g.lon, source: "chart" }));
     } else {
       gates = await fetchAirportGates(lat, lon);
     }
