@@ -2,23 +2,31 @@
  * api/gatemap.js
  * ----------------------------------------------------------------
  * Returns the gate/parking-position map for the airport nearest the
- * requested coordinates. For Sydney (YSSY), this now serves a curated,
- * chart-accurate list instead of OSM/Overpass data — see lib/yssy-gates.js
- * for why. Every other airport still uses the live OSM lookup via
- * lib/vatsim-gate-puller.js.
+ * requested coordinates. Sydney (YSSY) and Singapore Changi (WSSS) now
+ * serve curated, chart-accurate lists instead of OSM/Overpass data —
+ * see lib/yssy-gates.js and lib/wsss-gates.js for why. Every other
+ * airport still uses the live OSM lookup via lib/vatsim-gate-puller.js.
  */
 
 const { fetchAirportGates } = require("../lib/vatsim-gate-puller");
 const { YSSY_GATES } = require("../lib/yssy-gates");
+const { WSSS_GATES } = require("../lib/wsss-gates");
 
-const YSSY_CENTER = { lat: -33.9461, lon: 151.1772 };
-const YSSY_MATCH_RADIUS_DEG = 0.12; // ~13km, comfortably covers the whole YSSY precinct
+const CURATED_AIRPORTS = [
+  { center: { lat: -33.9461, lon: 151.1772 }, radiusDeg: 0.12, gates: YSSY_GATES },
+  { center: { lat: 1.3644, lon: 103.9915 }, radiusDeg: 0.12, gates: WSSS_GATES },
+];
 
-function isNearYssy(lat, lon) {
-  return (
-    Math.abs(lat - YSSY_CENTER.lat) <= YSSY_MATCH_RADIUS_DEG &&
-    Math.abs(lon - YSSY_CENTER.lon) <= YSSY_MATCH_RADIUS_DEG
-  );
+function findCuratedGates(lat, lon) {
+  for (const ap of CURATED_AIRPORTS) {
+    if (
+      Math.abs(lat - ap.center.lat) <= ap.radiusDeg &&
+      Math.abs(lon - ap.center.lon) <= ap.radiusDeg
+    ) {
+      return ap.gates;
+    }
+  }
+  return null;
 }
 
 module.exports = async function handler(req, res) {
@@ -31,9 +39,10 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    const curated = findCuratedGates(lat, lon);
     let gates;
-    if (isNearYssy(lat, lon)) {
-      gates = YSSY_GATES.map((g) => ({ code: g.code, lat: g.lat, lon: g.lon, source: "chart" }));
+    if (curated) {
+      gates = curated.map((g) => ({ code: g.code, lat: g.lat, lon: g.lon, source: "chart" }));
     } else {
       gates = await fetchAirportGates(lat, lon);
     }
