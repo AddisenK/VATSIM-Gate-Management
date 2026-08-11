@@ -43,7 +43,7 @@
 
 <div id="map"></div>
 
-<div class="hint" id="hintBox">Zoom in on any airport (zoom level 12+) — gates for that area load automatically as you move the map. No preset needed.</div>
+<div class="hint" id="hintBox">Zoom in on any airport (zoom level 12+) — gate positions load once, then only live VATSIM occupancy refreshes every 15s.</div>
 
 <div class="legend">
   <div class="row"><span class="dot green"></span> Available</div>
@@ -64,16 +64,18 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19
 }).addTo(map);
 
-let markers = [];
+let markers = new Map();
 let refreshTimer = null;
 let countdownTimer = null;
 let secondsLeft = REFRESH_INTERVAL_S;
 let moveDebounce = null;
-let lastLoadedCenter = null;
 
-function clearMarkers(){
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
+const gateMapCache = new Map();
+let currentGates = null;
+let currentCenter = null;
+
+function cacheKey(lat, lon){
+  return `${Math.round(lat*200)/200},${Math.round(lon*200)/200}`;
 }
 
 function colorFor(status){
@@ -93,7 +95,7 @@ function startCountdown(){
   countdownTimer = setInterval(() => {
     secondsLeft -= 1;
     if(secondsLeft <= 0){
-      document.getElementById('countdown').innerHTML = `<span class="spinner"></span>Refreshing...`;
+      document.getElementById('countdown').innerHTML = `<span class="spinner"></span>Refreshing occupancy...`;
     } else {
       document.getElementById('countdown').innerHTML = `Auto-refresh in <b>${secondsLeft}</b>s`;
     }
@@ -102,64 +104,110 @@ function startCountdown(){
 
 function scheduleAutoRefresh(){
   if(refreshTimer) clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(() => {
-    if(lastLoadedCenter) loadGates(lastLoadedCenter.lat, lastLoadedCenter.lon);
-  }, REFRESH_INTERVAL_S * 1000);
+  refreshTimer = setTimeout(refreshOccupancy, REFRESH_INTERVAL_S * 1000);
   startCountdown();
 }
 
-async function loadGates(lat, lon){
+function renderGateBase(gates){
+  markers.forEach(m => map.removeLayer(m));
+  markers.clear();
+  gates.forEach(g => {
+    const marker = L.circleMarker([g.lat, g.lon], {
+      radius: 4,
+      color: '#3fd68a',
+      fillColor: '#3fd68a',
+      fillOpacity: 0.85,
+      weight: 1.5
+    }).addTo(map);
+    marker.bindPopup(`<div class="popup-title">Gate ${g.code}</div><div class="popup-row">Loading status...</div>`);
+    markers.set(g.code, marker);
+  });
+}
+
+function applyOccupancy(gates){
+  let occCount = 0, unvCount = 0;
+  gates.forEach(g => {
+    if(g.status === 'occupied') occCount++;
+    if(g.status === 'unverified') unvCount++;
+    const marker = markers.get(g.gate);
+    if(!marker) return;
+    marker.setStyle({
+      radius: g.status === 'available' ? 4 : 7,
+      color: colorFor(g.status),
+      fillColor: colorFor(g.status)
+    });
+    const popupHtml = `
+      <div class="popup-title">Gate ${g.gate}</div>
+      <div class="popup-row">Status: <b>${g.status}</b></div>
+      ${g.confidence ? `<div class="popup-row">Confidence: <b>${g.confidence}</b></div>` : ''}
+      ${g.callsign ? `<div class="popup-row">Flight: <b>${g.callsign}</b></div>` : ''}
+      ${g.aircraft ? `<div class="popup-row">Aircraft: <b>${g.aircraft}</b></div>` : ''}
+    `;
+    marker.setPopupContent(popupHtml);
+  });
+  return { occCount, unvCount };
+}
+
+async function refreshOccupancy(){
+  if(!currentGates || !currentCenter){ scheduleAutoRefresh(); return; }
   const status = document.getElementById('statusBar');
-  status.innerHTML = '<span class="spinner"></span> Fetching live gate map + VATSIM traffic...';
-
   try{
-    const res = await fetch(`/api/gates?lat=${lat}&lon=${lon}`);
+    const res = await fetch('/api/occupancy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: currentCenter.lat, lon: currentCenter.lon, gates: currentGates })
+    });
     const data = await res.json();
-
     if(data.error){
-      status.textContent = 'Error: ' + data.error + ' (will retry automatically)';
+      status.textContent = 'Occupancy check error: ' + data.error + ' (will retry)';
       scheduleAutoRefresh();
       return;
     }
-
-    clearMarkers();
-    lastLoadedCenter = { lat, lon };
-
-    let occCount = 0, unvCount = 0;
-    data.gates.forEach(g => {
-      if(g.status === 'occupied') occCount++;
-      if(g.status === 'unverified') unvCount++;
-      const marker = L.circleMarker([g.lat, g.lon], {
-        radius: g.status === 'available' ? 4 : 7,
-        color: colorFor(g.status),
-        fillColor: colorFor(g.status),
-        fillOpacity: 0.85,
-        weight: 1.5
-      }).addTo(map);
-
-      const popupHtml = `
-        <div class="popup-title">Gate ${g.gate}</div>
-        <div class="popup-row">Status: <b>${g.status}</b></div>
-        ${g.confidence ? `<div class="popup-row">Confidence: <b>${g.confidence}</b></div>` : ''}
-        ${g.callsign ? `<div class="popup-row">Flight: <b>${g.callsign}</b></div>` : ''}
-        ${g.aircraft ? `<div class="popup-row">Aircraft: <b>${g.aircraft}</b></div>` : ''}
-      `;
-      marker.bindPopup(popupHtml);
-      markers.push(marker);
-    });
-
-    if(data.gateCount === 0){
-      status.textContent = 'No labeled gates found in OSM near this location — try a different area or airport.';
-    } else {
-      status.innerHTML = `Loaded <b>${data.gateCount}</b> gates — ` +
-        `<span style="color:#f5546c;">${occCount} occupied</span>, ` +
-        `<span style="color:#f5a83f;">${unvCount} unverified</span>, ` +
-        `${data.gateCount - occCount - unvCount} available. Polled at ${new Date(data.polledAt).toLocaleTimeString()}.`;
-    }
+    const { occCount, unvCount } = applyOccupancy(data.gates);
+    status.innerHTML = `Loaded <b>${data.gateCount}</b> gates — ` +
+      `<span style="color:#f5546c;">${occCount} occupied</span>, ` +
+      `<span style="color:#f5a83f;">${unvCount} unverified</span>, ` +
+      `${data.gateCount - occCount - unvCount} available. Polled at ${new Date(data.polledAt).toLocaleTimeString()}.`;
   } catch(err){
-    status.textContent = 'Request failed: ' + err.message + ' (will retry automatically)';
+    status.textContent = 'Occupancy refresh failed: ' + err.message + ' (will retry)';
   }
   scheduleAutoRefresh();
+}
+
+async function loadGateMapAndStart(lat, lon){
+  const status = document.getElementById('statusBar');
+  const key = cacheKey(lat, lon);
+  currentCenter = { lat, lon };
+
+  if(gateMapCache.has(key)){
+    currentGates = gateMapCache.get(key);
+    renderGateBase(currentGates);
+    status.innerHTML = '<span class="spinner"></span> Gate map cached — checking live occupancy...';
+    refreshOccupancy();
+    return;
+  }
+
+  status.innerHTML = '<span class="spinner"></span> Loading gate map for this area (one-time, cached after)...';
+  try{
+    const res = await fetch(`/api/gatemap?lat=${lat}&lon=${lon}`);
+    const data = await res.json();
+    if(data.error){
+      status.textContent = 'Error loading gate map: ' + data.error;
+      return;
+    }
+    if(data.gateCount === 0){
+      status.textContent = 'No labeled gates found in OSM near this location.';
+      currentGates = [];
+      return;
+    }
+    currentGates = data.gates;
+    gateMapCache.set(key, currentGates);
+    renderGateBase(currentGates);
+    status.innerHTML = `Gate map loaded (<b>${data.gateCount}</b> gates) — checking live occupancy...`;
+    refreshOccupancy();
+  } catch(err){
+    status.textContent = 'Gate map request failed: ' + err.message;
+  }
 }
 
 function onMapSettled(){
@@ -177,7 +225,7 @@ function onMapSettled(){
   }
   hint.style.display = 'none';
   const center = map.getCenter();
-  loadGates(center.lat.toFixed(5), center.lng.toFixed(5));
+  loadGateMapAndStart(center.lat.toFixed(5), center.lng.toFixed(5));
 }
 
 map.on('moveend zoomend', () => {
