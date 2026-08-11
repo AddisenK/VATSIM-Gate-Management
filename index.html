@@ -57,6 +57,7 @@
 <script>
 const MIN_ZOOM_FOR_GATES = 12;
 const REFRESH_INTERVAL_S = 15;
+const GATEMAP_RETRY_DELAY_MS = 4000;
 
 let map = L.map('map', { zoomControl: true }).setView([50.0333, 8.5706], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -73,6 +74,7 @@ let moveDebounce = null;
 const gateMapCache = new Map();
 let currentGates = null;
 let currentCenter = null;
+let gatemapRetryTimer = null;
 
 function cacheKey(lat, lon){
   return `${Math.round(lat*200)/200},${Math.round(lon*200)/200}`;
@@ -149,7 +151,7 @@ function applyOccupancy(gates){
 }
 
 async function refreshOccupancy(){
-  if(!currentGates || !currentCenter){ scheduleAutoRefresh(); return; }
+  if(!currentGates || currentGates.length === 0 || !currentCenter){ scheduleAutoRefresh(); return; }
   const status = document.getElementById('statusBar');
   try{
     const res = await fetch('/api/occupancy', {
@@ -178,6 +180,7 @@ async function loadGateMapAndStart(lat, lon){
   const status = document.getElementById('statusBar');
   const key = cacheKey(lat, lon);
   currentCenter = { lat, lon };
+  if(gatemapRetryTimer) clearTimeout(gatemapRetryTimer);
 
   if(gateMapCache.has(key)){
     currentGates = gateMapCache.get(key);
@@ -190,9 +193,13 @@ async function loadGateMapAndStart(lat, lon){
   status.innerHTML = '<span class="spinner"></span> Loading gate map for this area (one-time, cached after)...';
   try{
     const res = await fetch(`/api/gatemap?lat=${lat}&lon=${lon}`);
+    if(!res.ok){
+      throw new Error(`Server returned ${res.status}`);
+    }
     const data = await res.json();
     if(data.error){
-      status.textContent = 'Error loading gate map: ' + data.error;
+      status.innerHTML = `Gate map error: ${data.error} — <span class="spinner"></span>retrying in 4s...`;
+      gatemapRetryTimer = setTimeout(() => loadGateMapAndStart(lat, lon), GATEMAP_RETRY_DELAY_MS);
       return;
     }
     if(data.gateCount === 0){
@@ -206,7 +213,8 @@ async function loadGateMapAndStart(lat, lon){
     status.innerHTML = `Gate map loaded (<b>${data.gateCount}</b> gates) — checking live occupancy...`;
     refreshOccupancy();
   } catch(err){
-    status.textContent = 'Gate map request failed: ' + err.message;
+    status.innerHTML = `Gate map request failed: ${err.message} — <span class="spinner"></span>retrying in 4s...`;
+    gatemapRetryTimer = setTimeout(() => loadGateMapAndStart(lat, lon), GATEMAP_RETRY_DELAY_MS);
   }
 }
 
@@ -220,6 +228,7 @@ function onMapSettled(){
     hint.style.display = 'block';
     if(refreshTimer) clearTimeout(refreshTimer);
     if(countdownTimer) clearInterval(countdownTimer);
+    if(gatemapRetryTimer) clearTimeout(gatemapRetryTimer);
     document.getElementById('countdown').textContent = 'Zoom in to load gates';
     return;
   }

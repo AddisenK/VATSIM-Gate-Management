@@ -1,20 +1,17 @@
 /**
  * api/gatemap.js
  * ----------------------------------------------------------------
- * Returns ONLY the airport's gate positions (expensive Overpass queries:
- * gates + runway geometry + apron/taxiway geometry). This should be called
- * once per location/zoom-settle, not on every refresh — the physical layout
- * of an airport barely ever changes.
+ * Returns ONLY the airport's gate positions. Now issues a SINGLE combined
+ * Overpass query (see lib/vatsim-gate-puller.js) instead of 3 separate
+ * requests, to stay well within serverless function execution limits.
  *
  * Usage: GET /api/gatemap?lat=50.0333&lon=8.5706
  * Response: { gates: [{ code, lat, lon }, ...] }
- *
- * Sends a long CDN cache header (30 min) since repeated requests for the
- * same rounded coordinates can be served from cache instead of hitting
- * Overpass again.
  */
 
 const { fetchAirportGates } = require("../lib/vatsim-gate-puller");
+
+module.exports.config = { maxDuration: 30 };
 
 module.exports = async (req, res) => {
   const { lat, lon } = req.query;
@@ -31,6 +28,6 @@ module.exports = async (req, res) => {
     res.setHeader("Cache-Control", "public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600");
     res.status(200).json({ gateCount: gates.length, gates });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(502).json({ error: `Gate map lookup failed: ${err.message}` });
   }
 };
