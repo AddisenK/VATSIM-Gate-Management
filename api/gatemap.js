@@ -2,31 +2,34 @@
  * api/gatemap.js
  * ----------------------------------------------------------------
  * Returns the gate/parking-position map for the airport nearest the
- * requested coordinates. Sydney (YSSY), Singapore Changi (WSSS), and
- * London Heathrow (EGLL) now serve curated, chart-accurate lists
- * instead of OSM/Overpass data — see lib/yssy-gates.js,
- * lib/wsss-gates.js, and lib/egll-gates.js for why. Every other
- * airport still uses the live OSM lookup via lib/vatsim-gate-puller.js.
+ * requested coordinates. Sydney (YSSY), Singapore Changi (WSSS),
+ * London Heathrow (EGLL), and JFK (KJFK) now serve curated lists
+ * instead of OSM/Overpass data. YSSY/WSSS/EGLL are official AIP chart
+ * data; KJFK is community-derived (FlightGear ground-network file) --
+ * see lib/kjfk-gates.js for that caveat. Every other airport still
+ * uses the live OSM lookup via lib/vatsim-gate-puller.js.
  */
 
 const { fetchAirportGates } = require("../lib/vatsim-gate-puller");
 const { YSSY_GATES } = require("../lib/yssy-gates");
 const { WSSS_GATES } = require("../lib/wsss-gates");
 const { EGLL_GATES } = require("../lib/egll-gates");
+const { KJFK_GATES } = require("../lib/kjfk-gates");
 
 const CURATED_AIRPORTS = [
-  { center: { lat: -33.9461, lon: 151.1772 }, radiusDeg: 0.12, gates: YSSY_GATES },
-  { center: { lat: 1.3644, lon: 103.9915 }, radiusDeg: 0.12, gates: WSSS_GATES },
-  { center: { lat: 51.4700, lon: -0.4543 }, radiusDeg: 0.12, gates: EGLL_GATES },
+  { center: { lat: -33.9461, lon: 151.1772 }, radiusDeg: 0.12, gates: YSSY_GATES, source: "chart" },
+  { center: { lat: 1.3644, lon: 103.9915 }, radiusDeg: 0.12, gates: WSSS_GATES, source: "chart" },
+  { center: { lat: 51.4700, lon: -0.4543 }, radiusDeg: 0.12, gates: EGLL_GATES, source: "chart" },
+  { center: { lat: 40.6413, lon: -73.7781 }, radiusDeg: 0.14, gates: KJFK_GATES, source: "community" },
 ];
 
-function findCuratedGates(lat, lon) {
+function findCuratedAirport(lat, lon) {
   for (const ap of CURATED_AIRPORTS) {
     if (
       Math.abs(lat - ap.center.lat) <= ap.radiusDeg &&
       Math.abs(lon - ap.center.lon) <= ap.radiusDeg
     ) {
-      return ap.gates;
+      return ap;
     }
   }
   return null;
@@ -42,12 +45,12 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const curated = findCuratedGates(lat, lon);
+    const curated = findCuratedAirport(lat, lon);
     let gates;
     if (curated) {
-      gates = curated
+      gates = curated.gates
         .filter((g) => g.lat != null && g.lon != null)
-        .map((g) => ({ code: g.code, lat: g.lat, lon: g.lon, source: "chart" }));
+        .map((g) => ({ code: g.code, lat: g.lat, lon: g.lon, source: curated.source }));
     } else {
       gates = await fetchAirportGates(lat, lon);
     }
