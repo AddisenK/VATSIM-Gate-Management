@@ -7,8 +7,16 @@
  * curated lists instead of OSM/Overpass data. YSSY/WSSS/EGLL/LFPG are
  * official AIP chart data; KJFK is community-derived -- see
  * lib/kjfk-gates.js and lib/lfpg-gates.js for source caveats (LFPG is
- * also only ~63% complete -- see that file's header). Every other
- * airport still uses the live OSM lookup via lib/vatsim-gate-puller.js.
+ * also only ~63% complete -- see that file's header).
+ *
+ * YSSY gates use TERMINAL-PREFIXED codes (T1-<bay>, T2-<bay>, T3-<bay>)
+ * as their unique `code` -- Sydney reuses bare bay numbers across
+ * terminals (e.g. bay "1" exists at both T1 and T3, ~1km apart), so the
+ * bare number alone must never be treated as unique. See
+ * lib/yssy-gates.js for details.
+ *
+ * Every other airport still uses the live OSM lookup via
+ * lib/vatsim-gate-puller.js.
  */
 
 const { fetchAirportGates } = require("../lib/vatsim-gate-puller");
