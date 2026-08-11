@@ -1,0 +1,10 @@
+{
+  "name": "vatsim-gate-management",
+  "version": "1.0.0",
+  "description": "Open-source puller that overlays live VATSIM aircraft positions onto real airport gate maps (OpenStreetMap) to infer gate occupancy, with confidence scoring.",
+  "license": "MIT",
+  "main": "lib/vatsim-gate-puller.js",
+  "engines": {
+    "node": ">=18"
+  }
+}
