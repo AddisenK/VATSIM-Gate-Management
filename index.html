@@ -2,44 +2,144 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>VATSIM Gate Management API</title>
+<title>VATSIM Gate Management — Live Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:#0b0f14;color:#e8edf2;padding:40px 20px;}
-  .wrap{max-width:720px;margin:0 auto;}
-  h1{color:#3fa9f5;font-size:24px;}
-  h2{color:#3fa9f5;font-size:16px;margin-top:32px;}
-  code, .code-block{background:#161d27;border:1px solid #232c37;border-radius:6px;padding:2px 8px;font-family:Consolas,monospace;color:#8fd3ff;}
-  .code-block{display:block;padding:14px;white-space:pre-wrap;margin:10px 0;font-size:13px;}
-  a{color:#3fa9f5;}
-  .badge{display:inline-block;background:#3fd68a33;color:#3fd68a;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:bold;}
-  .note{color:#8b98a5;font-size:13px;line-height:1.6;}
-  ul{color:#e8edf2;line-height:1.7;}
+  :root{
+    --bg:#0b0f14; --panel:#121820; --panel2:#161d27; --accent:#3fa9f5; --accent2:#f5a83f;
+    --green:#3fd68a; --red:#f5546c; --text:#e8edf2; --muted:#8b98a5; --border:#232c37;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{background:linear-gradient(90deg,#0d1420,#131a26);padding:14px 20px;border-bottom:2px solid var(--accent);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  header h1{margin:0;font-size:18px;letter-spacing:1px;}
+  header h1 span{color:var(--accent);}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .controls input{width:110px;padding:6px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;}
+  .controls button{padding:6px 14px;background:var(--accent);border:none;border-radius:6px;color:#0b0f14;font-weight:bold;cursor:pointer;font-size:13px;}
+  .controls button:hover{background:#5cb8ff;}
+  .controls button:disabled{opacity:.5;cursor:not-allowed;}
+  #map{position:absolute;top:56px;left:0;right:0;bottom:0;}
+  .legend{position:absolute;bottom:20px;left:20px;background:rgba(18,24,32,0.92);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;z-index:1000;color:var(--text);}
+  .legend .row{display:flex;align-items:center;gap:6px;margin:3px 0;}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+  .dot.green{background:var(--green);}
+  .dot.red{background:var(--red);}
+  .dot.orange{background:var(--accent2);}
+  .status-bar{position:absolute;top:66px;right:16px;background:rgba(18,24,32,0.92);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--muted);z-index:1000;max-width:280px;}
+  .spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .leaflet-popup-content-wrapper{background:#161d27;color:#e8edf2;border-radius:8px;}
+  .leaflet-popup-tip{background:#161d27;}
+  .popup-title{font-weight:bold;color:#3fa9f5;font-size:14px;margin-bottom:4px;}
+  .popup-row{font-size:12px;color:#8b98a5;margin:2px 0;}
+  .popup-row b{color:#e8edf2;}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <span class="badge">API ONLINE</span>
-  <h1>VATSIM Gate Management</h1>
-  <p class="note">This project has no visual homepage — it's a single API endpoint that overlays live VATSIM aircraft positions onto real airport gate maps (pulled live from OpenStreetMap) to infer gate occupancy.</p>
 
-  <h2>Endpoint</h2>
-  <div class="code-block">GET /api/gates?lat={airport_lat}&lon={airport_lon}</div>
+<header>
+  <h1>VATSIM <span>Gate Map</span></h1>
+  <div class="controls">
+    <input type="text" id="lat" value="50.0333" placeholder="lat">
+    <input type="text" id="lon" value="8.5706" placeholder="lon">
+    <button id="loadBtn" onclick="loadGates()">Load Gates</button>
+  </div>
+</header>
 
-  <h2>Try it now (Frankfurt / EDDF)</h2>
-  <p><a href="/api/gates?lat=50.0333&lon=8.5706" target="_blank">/api/gates?lat=50.0333&lon=8.5706</a></p>
+<div id="map"></div>
 
-  <h2>Response fields</h2>
-  <ul>
-    <li><code>gate</code> — gate/stand identifier (from OpenStreetMap)</li>
-    <li><code>status</code> — "available", "occupied", or "unverified"</li>
-    <li><code>confidence</code> — null, "low", "medium", or "high" (never treated as ground truth)</li>
-    <li><code>callsign</code> / <code>aircraft</code> — the live VATSIM flight matched to that gate, if any</li>
-  </ul>
-
-  <h2>Known limitations</h2>
-  <p class="note">VATSIM has no gate field — occupancy is inferred via position matching, not received as fact. OSM gate coverage varies by airport. Multi-poll confidence requires persisted state across requests, which is limited on serverless — see the repo README for details.</p>
-
-  <p class="note">Source: <a href="https://github.com/AddisenK/VATSIM-Gate-Management">github.com/AddisenK/VATSIM-Gate-Management</a> — MIT licensed, open source.</p>
+<div class="legend">
+  <div class="row"><span class="dot green"></span> Available</div>
+  <div class="row"><span class="dot red"></span> Occupied (medium/high confidence)</div>
+  <div class="row"><span class="dot orange"></span> Unverified (low confidence)</div>
 </div>
+
+<div class="status-bar" id="statusBar">Enter an airport lat/lon and click "Load Gates".</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map = L.map('map', { zoomControl: true }).setView([50.0333, 8.5706], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(map);
+
+let markers = [];
+
+function clearMarkers(){
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+}
+
+function colorFor(status){
+  if(status === 'occupied') return '#f5546c';
+  if(status === 'unverified') return '#f5a83f';
+  return '#3fd68a';
+}
+
+async function loadGates(){
+  const lat = parseFloat(document.getElementById('lat').value);
+  const lon = parseFloat(document.getElementById('lon').value);
+  const btn = document.getElementById('loadBtn');
+  const status = document.getElementById('statusBar');
+
+  if(Number.isNaN(lat) || Number.isNaN(lon)){
+    status.textContent = 'Please enter valid numeric lat/lon.';
+    return;
+  }
+
+  btn.disabled = true;
+  status.innerHTML = '<span class="spinner"></span> Fetching live gate map + VATSIM traffic...';
+
+  try{
+    const res = await fetch(`/api/gates?lat=${lat}&lon=${lon}`);
+    const data = await res.json();
+
+    if(data.error){
+      status.textContent = 'Error: ' + data.error + ' (try again — free Overpass server occasionally times out)';
+      btn.disabled = false;
+      return;
+    }
+
+    clearMarkers();
+    map.setView([lat, lon], 15);
+
+    let occCount = 0, unvCount = 0;
+    data.gates.forEach(g => {
+      if(g.status === 'occupied') occCount++;
+      if(g.status === 'unverified') unvCount++;
+      const marker = L.circleMarker([g.lat, g.lon], {
+        radius: g.status === 'available' ? 4 : 7,
+        color: colorFor(g.status),
+        fillColor: colorFor(g.status),
+        fillOpacity: 0.85,
+        weight: 1.5
+      }).addTo(map);
+
+      const popupHtml = `
+        <div class="popup-title">Gate ${g.gate}</div>
+        <div class="popup-row">Status: <b>${g.status}</b></div>
+        ${g.confidence ? `<div class="popup-row">Confidence: <b>${g.confidence}</b></div>` : ''}
+        ${g.callsign ? `<div class="popup-row">Flight: <b>${g.callsign}</b></div>` : ''}
+        ${g.aircraft ? `<div class="popup-row">Aircraft: <b>${g.aircraft}</b></div>` : ''}
+      `;
+      marker.bindPopup(popupHtml);
+      markers.push(marker);
+    });
+
+    status.innerHTML = `Loaded <b>${data.gateCount}</b> gates near (${lat}, ${lon}) — ` +
+      `<span style="color:#f5546c;">${occCount} occupied</span>, ` +
+      `<span style="color:#f5a83f;">${unvCount} unverified</span>, ` +
+      `${data.gateCount - occCount - unvCount} available. Polled at ${new Date(data.polledAt).toLocaleTimeString()}.`;
+  } catch(err){
+    status.textContent = 'Request failed: ' + err.message;
+  }
+  btn.disabled = false;
+}
+
+loadGates();
+</script>
+
 </body>
 </html>
