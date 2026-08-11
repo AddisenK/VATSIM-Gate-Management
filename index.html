@@ -19,6 +19,8 @@
   .controls button{padding:6px 14px;background:var(--accent);border:none;border-radius:6px;color:#0b0f14;font-weight:bold;cursor:pointer;font-size:13px;}
   .controls button:hover{background:#5cb8ff;}
   .controls button:disabled{opacity:.5;cursor:not-allowed;}
+  .countdown{font-size:12px;color:var(--muted);padding:6px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;}
+  .countdown b{color:var(--accent);}
   #map{position:absolute;top:56px;left:0;right:0;bottom:0;}
   .legend{position:absolute;bottom:20px;left:20px;background:rgba(18,24,32,0.92);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;z-index:1000;color:var(--text);}
   .legend .row{display:flex;align-items:center;gap:6px;margin:3px 0;}
@@ -43,7 +45,8 @@
   <div class="controls">
     <input type="text" id="lat" value="50.0333" placeholder="lat">
     <input type="text" id="lon" value="8.5706" placeholder="lon">
-    <button id="loadBtn" onclick="loadGates()">Load Gates</button>
+    <button id="loadBtn" onclick="loadGates(true)">Load Gates</button>
+    <div class="countdown" id="countdown">Auto-refresh in <b>15</b>s</div>
   </div>
 </header>
 
@@ -51,7 +54,7 @@
 
 <div class="legend">
   <div class="row"><span class="dot green"></span> Available</div>
-  <div class="row"><span class="dot red"></span> Occupied (medium/high confidence)</div>
+  <div class="row"><span class="dot red"></span> Occupied</div>
   <div class="row"><span class="dot orange"></span> Unverified (low confidence)</div>
 </div>
 
@@ -66,6 +69,10 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 let markers = [];
+let refreshTimer = null;
+let countdownTimer = null;
+let secondsLeft = 15;
+const REFRESH_INTERVAL_S = 15;
 
 function clearMarkers(){
   markers.forEach(m => map.removeLayer(m));
@@ -78,7 +85,31 @@ function colorFor(status){
   return '#3fd68a';
 }
 
-async function loadGates(){
+function resetCountdown(){
+  secondsLeft = REFRESH_INTERVAL_S;
+  document.getElementById('countdown').innerHTML = `Auto-refresh in <b>${secondsLeft}</b>s`;
+}
+
+function startCountdown(){
+  if(countdownTimer) clearInterval(countdownTimer);
+  resetCountdown();
+  countdownTimer = setInterval(() => {
+    secondsLeft -= 1;
+    if(secondsLeft <= 0){
+      document.getElementById('countdown').innerHTML = `<span class="spinner"></span>Refreshing...`;
+    } else {
+      document.getElementById('countdown').innerHTML = `Auto-refresh in <b>${secondsLeft}</b>s`;
+    }
+  }, 1000);
+}
+
+function scheduleAutoRefresh(){
+  if(refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => loadGates(false), REFRESH_INTERVAL_S * 1000);
+  startCountdown();
+}
+
+async function loadGates(recenter){
   const lat = parseFloat(document.getElementById('lat').value);
   const lon = parseFloat(document.getElementById('lon').value);
   const btn = document.getElementById('loadBtn');
@@ -97,13 +128,14 @@ async function loadGates(){
     const data = await res.json();
 
     if(data.error){
-      status.textContent = 'Error: ' + data.error + ' (try again — free Overpass server occasionally times out)';
+      status.textContent = 'Error: ' + data.error + ' (will retry automatically on next refresh)';
       btn.disabled = false;
+      scheduleAutoRefresh();
       return;
     }
 
     clearMarkers();
-    map.setView([lat, lon], 15);
+    if(recenter) map.setView([lat, lon], 15);
 
     let occCount = 0, unvCount = 0;
     data.gates.forEach(g => {
@@ -133,12 +165,13 @@ async function loadGates(){
       `<span style="color:#f5a83f;">${unvCount} unverified</span>, ` +
       `${data.gateCount - occCount - unvCount} available. Polled at ${new Date(data.polledAt).toLocaleTimeString()}.`;
   } catch(err){
-    status.textContent = 'Request failed: ' + err.message;
+    status.textContent = 'Request failed: ' + err.message + ' (will retry automatically)';
   }
   btn.disabled = false;
+  scheduleAutoRefresh();
 }
 
-loadGates();
+loadGates(true);
 </script>
 
 </body>
