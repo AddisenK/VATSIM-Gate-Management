@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DISPATCH — Concept Prototype</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121820; --panel2:#161d27; --accent:#3fa9f5; --accent2:#f5a83f;
+    --green:#3fd68a; --red:#f5546c; --text:#e8edf2; --muted:#8b98a5; --border:#232c37;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{background:linear-gradient(90deg,#0d1420,#131a26);padding:16px 24px;border-bottom:2px solid var(--accent);display:flex;justify-content:space-between;align-items:center;}
+  header h1{margin:0;font-size:20px;letter-spacing:2px;}
+  header h1 span{color:var(--accent);}
+  header .tag{color:var(--muted);font-size:12px;}
+  nav{display:flex;background:var(--panel2);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  nav button{flex:1;min-width:120px;padding:14px;background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;border-bottom:3px solid transparent;transition:.2s;}
+  nav button:hover{color:var(--text);}
+  nav button.active{color:var(--accent);border-bottom:3px solid var(--accent);background:var(--panel);}
+  main{padding:24px;max-width:1100px;margin:0 auto;}
+  .view{display:none;animation:fade .25s ease;}
+  .view.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;}
+  .card h2{margin-top:0;font-size:16px;color:var(--accent);border-bottom:1px solid var(--border);padding-bottom:8px;}
+  .row{display:flex;gap:16px;flex-wrap:wrap;}
+  .col{flex:1;min-width:220px;}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;margin-top:10px;}
+  input,select{width:100%;padding:8px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;}
+  button.action{margin-top:16px;padding:10px 18px;background:var(--accent);border:none;border-radius:6px;color:#0b0f14;font-weight:bold;cursor:pointer;font-size:14px;}
+  button.action:hover{background:#5cb8ff;}
+  button.action:disabled{opacity:.5;cursor:not-allowed;}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center;flex:1;min-width:110px;}
+  .stat .val{font-size:22px;font-weight:bold;color:var(--green);}
+  .stat.warn .val{color:var(--accent2);}
+  .stat .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:bold;}
+  .badge.limit{background:#3fa9f533;color:var(--accent);}
+  .badge.eng{background:#f5546c33;color:var(--red);}
+  .badge.rec{background:#f5a83f33;color:var(--accent2);}
+  .procedure-box{background:var(--panel2);border-left:3px solid var(--accent2);padding:12px 16px;border-radius:6px;font-size:14px;line-height:1.6;}
+  .gate-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-top:12px;}
+  .gate{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 4px;text-align:center;font-size:12px;cursor:pointer;transition:.15s;position:relative;}
+  .gate:hover{border-color:var(--accent);}
+  .gate.occupied{opacity:.4;cursor:not-allowed;border-color:var(--red);}
+  .gate.lowconf{border-style:dashed;border-color:var(--accent2);}
+  .gate.recommended{border-color:var(--accent2);box-shadow:0 0 0 1px var(--accent2);}
+  .gate.selected{background:var(--accent);color:#0b0f14;font-weight:bold;border-color:var(--accent);}
+  .gate .code{font-weight:bold;font-size:14px;}
+  .gate .size{font-size:10px;color:var(--muted);}
+  .gate .who{font-size:9px;color:var(--red);}
+  .gate.selected .size{color:#0b0f1299;}
+  .release{background:#0d1219;border:1px dashed var(--accent);border-radius:8px;padding:20px;font-family:'Consolas',monospace;font-size:13px;line-height:1.7;white-space:pre-wrap;}
+  .footer-note{color:var(--muted);font-size:12px;text-align:center;margin-top:30px;padding-top:14px;border-top:1px solid var(--border);}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:3px 10px;font-size:11px;margin-right:6px;color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+  tr.occ-row{background:#f5546c14;}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;}
+  .dot.green{background:var(--green);}
+  .dot.red{background:var(--red);}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;}
+  .code-block{background:#0d1219;border:1px solid var(--border);border-radius:6px;padding:12px;font-family:Consolas,monospace;font-size:12px;color:#8fd3ff;overflow-x:auto;white-space:pre;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DIS<span>PATCH</span></h1>
+  <div class="tag">Concept prototype — SimBrief + confidence-rated VATSIM occupancy</div>
+</header>
+
+<nav>
+  <button class="tab active" data-view="ofp">1. OFP Import</button>
+  <button class="tab" data-view="perf">2. Performance</button>
+  <button class="tab" data-view="chart">3. Procedure Chart</button>
+  <button class="tab" data-view="vatsim">4. VATSIM Occupancy</button>
+  <button class="tab" data-view="gate">5. Gate Assigner</button>
+  <button class="tab" data-view="release">6. Dispatch Release</button>
+</nav>
+
+<main>
+
+  <!-- VIEW 1: OFP IMPORT -->
+  <section class="view active" id="ofp">
+    <div class="card">
+      <h2>Import Flight Plan (SimBrief)</h2>
+      <div class="row">
+        <div class="col">
+          <label>SimBrief Username / OFP ID</label>
+          <input type="text" id="pilotCallsign" value="QFA6">
+        </div>
+        <div class="col">
+          <label>Aircraft Type</label>
+          <select id="pilotAircraft"><option>B77W</option><option>A359</option><option>A320</option><option>B789</option></select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <div class="col">
+          <label>Departure</label>
+          <input type="text" value="YSSY — Sydney Kingsford Smith">
+        </div>
+        <div class="col">
+          <label>Arrival</label>
+          <input type="text" id="arrivalIcao" value="EDDF">
+        </div>
+      </div>
+      <button class="action" onclick="go('perf')">Pull OFP & Continue →</button>
+    </div>
+    <div class="card">
+      <h2>Imported Data Preview</h2>
+      <div class="row">
+        <div class="stat"><div class="val">312.4t</div><div class="lbl">TOW</div></div>
+        <div class="stat"><div class="val">248.1t</div><div class="lbl">ZFW</div></div>
+        <div class="stat"><div class="val">14.2h</div><div class="lbl">Flight Time</div></div>
+        <div class="stat"><div class="val">08°C</div><div class="lbl">METAR Temp</div></div>
+        <div class="stat"><div class="val">070/12kt</div><div class="lbl">Wind</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 2: PERFORMANCE -->
+  <section class="view" id="perf">
+    <div class="card">
+      <h2>Takeoff Performance — RWY 34L, YSSY</h2>
+      <div class="row">
+        <div class="stat"><div class="val">V1 149</div><div class="lbl">Decision Speed</div></div>
+        <div class="stat"><div class="val">VR 158</div><div class="lbl">Rotate</div></div>
+        <div class="stat"><div class="val">V2 168</div><div class="lbl">Takeoff Safety</div></div>
+        <div class="stat warn"><div class="val">FLEX 58°C</div><div class="lbl">Assumed Temp</div></div>
+        <div class="stat"><div class="val">FLAPS 5</div><div class="lbl">Config</div></div>
+      </div>
+      <div style="margin-top:14px;">
+        <span class="badge limit">Limiting factor: 2nd Segment Climb</span>
+        <span class="badge eng">Engine-out gradient: 2.9% (min 2.4%)</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Landing Performance — RWY 25C, EDDF</h2>
+      <div class="row">
+        <div class="stat"><div class="val">VREF 142</div><div class="lbl">Landing Ref Speed</div></div>
+        <div class="stat"><div class="val">1,780m</div><div class="lbl">Landing Distance Req.</div></div>
+        <div class="stat"><div class="val">3,900m</div><div class="lbl">Runway Available</div></div>
+        <div class="stat"><div class="val">AUTOBRK 2</div><div class="lbl">Setting</div></div>
+      </div>
+    </div>
+    <button class="action" onclick="go('chart')">View Procedure Chart →</button>
+  </section>
+
+  <!-- VIEW 3: CHART -->
+  <section class="view" id="chart">
+    <div class="card">
+      <h2>Engine-Out Departure Procedure — YSSY RWY 34L</h2>
+      <div class="procedure-box">
+      <b>EOSID: SYD1A (Engine-Out SID)</b><br>
+      Climb straight ahead on runway heading 342° to 800 ft.<br>
+      At 800 ft, initiate right turn heading 020° to intercept the 015° radial from SY VOR.<br>
+      Continue climb to MSA 3,400 ft, maintain 220 KIAS until obstacle clearance assured.<br>
+      Hold overhead SY VOR if required for weight reduction / return.<br><br>
+      <span class="pill">Climb gradient required: 2.4%</span>
+      <span class="pill">Achieved gradient: 2.9%</span>
+      <span class="pill">Obstacle: Terrain 1,100ft @ 4.2nm</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Track Diagram (concept placeholder)</h2>
+      <svg width="100%" height="180" viewBox="0 0 400 180">
+        <rect width="400" height="180" fill="#0d1219" rx="8"/>
+        <line x1="40" y1="150" x2="40" y2="30" stroke="#3fa9f5" stroke-width="3"/>
+        <path d="M40 30 Q100 10 160 40" stroke="#f5546c" stroke-width="2" fill="none" stroke-dasharray="5,4"/>
+        <circle cx="40" cy="150" r="4" fill="#3fd68a"/>
+        <text x="20" y="168" fill="#8b98a5" font-size="10">RWY 34L</text>
+        <text x="140" y="55" fill="#f5546c" font-size="10">EO turn 020°</text>
+        <circle cx="300" cy="20" r="10" fill="#f5a83f" opacity="0.7"/>
+        <text x="290" y="45" fill="#f5a83f" font-size="10">Terrain 1100ft</text>
+      </svg>
+    </div>
+    <button class="action" onclick="go('vatsim')">Check VATSIM Gate Occupancy →</button>
+  </section>
+
+  <!-- VIEW 4: VATSIM OCCUPANCY -->
+  <section class="view" id="vatsim">
+    <div class="card">
+      <h2>VATSIM Live Gate Occupancy — data.vatsim.net</h2>
+      <div class="procedure-box" style="border-left-color:var(--red);margin-bottom:12px;">
+        <b style="color:var(--red);">Important limitation</b><br>
+        VATSIM's own data feed does <b>not</b> include a gate field at all — even VATSIM Deparr's public documentation states "gate assignments are not available from VATSIM data." Any gate match here is Dispatch's own inference from position + speed, not ground truth from VATSIM. Treat every result below as a <b>confidence-rated guess</b>, never a guarantee.
+      </div>
+      <p class="note">VATSIM's public feed (<code>https://data.vatsim.net/v3/vatsim-data.json</code>) refreshes every 15 seconds, no API key required, and gives callsign, lat/lon, altitude, groundspeed, filed aircraft type, and <code>last_updated</code> timestamps. Dispatch improves reliability over a naive single-snapshot check by: (1) filtering to real pilot clients only — excluding ATC/observers, (2) requiring groundspeed &lt;5kt across at least 2–3 consecutive 15s polls before calling a position "settled," (3) discarding any pilot whose <code>last_updated</code> is stale (&gt;30s old, suggesting a dropped/ghost connection), and (4) applying a wider tolerance radius (~60–70m) per gate to absorb scenery/AFCAD offset errors reported across different simulators.</p>
+      <div class="row" style="margin-top:12px;">
+        <div class="col">
+          <label>Airport ICAO</label>
+          <input type="text" id="vatsimIcao" value="EDDF">
+        </div>
+      </div>
+      <button class="action" id="vatsimBtn" onclick="fetchVatsimOccupancy()">Pull VATSIM Snapshot (multi-poll)</button>
+      <div id="vatsimStatus" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="card" id="vatsimResultsCard" style="display:none;">
+      <h2>Reconciled Occupancy — <span id="vatsimIcaoLabel"></span></h2>
+      <table>
+        <thead><tr><th>Gate</th><th>Stand Size</th><th>Status</th><th>Occupying Callsign</th><th>Aircraft</th><th>Confidence</th></tr></thead>
+        <tbody id="vatsimTableBody"></tbody>
+      </table>
+      <div class="note" id="vatsimSummary"></div>
+    </div>
+
+    <div class="card">
+      <h2>Integration Reference — corrected VATSIM occupancy logic</h2>
+      <div class="code-block">// Poll history must persist between calls (in-memory cache or DB row per callsign)
+const pollHistory = new Map(); // callsign -> { count, lastSeen }
+
+async function getVatsimOccupancy(icao, gateCoords) {
+  const res = await fetch("https://data.vatsim.net/v3/vatsim-data.json");
+  const data = await res.json();
+  const now = Date.now();
+
+  const candidates = data.pilots.filter(p =>
+    p.groundspeed < 5 &&
+    p.flight_plan &&                 // no filed plan is often a ghost/observer artifact
+    isNear(p.latitude, p.longitude, icao, 3)
+  );
+
+  candidates.forEach(p => {
+    const ageMs = now - new Date(p.last_updated).getTime();
+    if (ageMs > 30000) return;        // stale feed entry -> treat as ghost, skip
+    const h = pollHistory.get(p.callsign) || { count: 0 };
+    h.count += 1;
+    h.lastSeen = now;
+    pollHistory.set(p.callsign, h);
+  });
+
+  return gateCoords.map(gate => {
+    const occupant = candidates.find(p =>
+      distanceMeters(p.latitude, p.longitude, gate.lat, gate.lon) < 70   // widened for scenery offset
+    );
+    const history = occupant ? pollHistory.get(occupant.callsign) : null;
+    const confidence = !history ? null
+      : history.count >= 3 ? "high"
+      : history.count === 2 ? "medium" : "low";
+
+    return {
+      ...gate,
+      occupied: confidence === "high" || confidence === "medium", // low confidence never auto-blocks
+      confidence,
+      callsign: occupant?.callsign || null,
+      aircraft: occupant?.flight_plan?.aircraft_short || null
+    };
+  });
+}</div>
+      <p class="note">Gate lat/lon reference points must still be curated per airport (OSM's <code>aeroway=parking_position</code> tags are a free starting dataset) — even established tools like vatsim-radar.com need manual per-airport correction for this. Confidence must build over multiple 15-second polls; a single snapshot is never trustworthy as ground truth.</p>
+    </div>
+    <button class="action" onclick="go('gate')">Proceed to Gate Assigner →</button>
+  </section>
+
+  <!-- VIEW 5: GATE ASSIGNER -->
+  <section class="view" id="gate">
+    <div class="card">
+      <h2>Dispatch — Gate Assignment, EDDF Terminal 1</h2>
+      <p style="color:var(--muted);font-size:13px;">Only <b>High/Medium confidence</b> occupied gates (solid red) are auto-blocked. <b style="color:var(--accent2)">Low-confidence</b> gates (dashed orange) are shown but still selectable — Dispatch flags them as "unverified" rather than pretending certainty. The <b style="color:var(--accent2)">recommended gate</b> uses real-world logic: aircraft/wingspan vs. stand class, plus airline pier match from the callsign.</p>
+      <div class="row" style="margin-top:10px;">
+        <div class="stat"><div class="val" id="acTypeDisplay">B77W</div><div class="lbl">Your Aircraft</div></div>
+        <div class="stat"><div class="val" id="airlineDisplay">QFA</div><div class="lbl">Airline (from callsign)</div></div>
+        <div class="stat"><div class="val">Code E</div><div class="lbl">Required Stand Class</div></div>
+      </div>
+      <div class="gate-grid" id="gateGrid" style="margin-top:14px;"></div>
+      <div id="gateResult" style="margin-top:14px;font-size:14px;color:var(--green);"></div>
+    </div>
+    <button class="action" onclick="go('release')">Generate Dispatch Release →</button>
+  </section>
+
+  <!-- VIEW 6: RELEASE -->
+  <section class="view" id="release">
+    <div class="card">
+      <h2>Dispatch Release — Final Document</h2>
+      <div class="release" id="releaseText">Run the VATSIM check and pick a gate on the previous tabs to generate the release.</div>
+    </div>
+  </section>
+
+</main>
+
+<div class="footer-note">Interactive concept prototype for Dispatch — click through the tabs above. All values are placeholder/mock data for demonstration only.</div>
+
+<script>
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(t=>t.addEventListener('click',()=>go(t.dataset.view)));
+function go(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelector('.tab[data-view="'+id+'"]').classList.add('active');
+  if(id==='gate'){
+    document.getElementById('acTypeDisplay').textContent = document.getElementById('pilotAircraft').value;
+    document.getElementById('airlineDisplay').textContent = document.getElementById('pilotCallsign').value.slice(0,3);
+    renderGates();
+  }
+}
+
+const gates = [
+  {code:'A12',size:'Code E',airline:'DLH'},{code:'A14',size:'Code E',airline:'DLH'},
+  {code:'A16',size:'Code F',airline:'QFA'},{code:'A18',size:'Code E',airline:'QFA'},
+  {code:'B21',size:'Code D',airline:'UAE'},{code:'B23',size:'Code E',airline:'UAE'},
+  {code:'B25',size:'Code F',airline:'AFR'},{code:'C31',size:'Code E',airline:'AFR'},
+  {code:'C33',size:'Code E',airline:'BAW'},{code:'C35',size:'Code D',airline:'BAW'},
+];
+
+// --- mock VATSIM pilots near EDDF, with multi-poll history + staleness (realistic corrected model) ---
+// pollsStationary: consecutive 15s polls seen with groundspeed<5kt near same position
+// secsSinceUpdate: age of last_updated field -> stale/ghost detector
+const mockVatsimPilots = [
+  {callsign:'DLH441', aircraft:'A359', gate:'A14', pollsStationary:4, secsSinceUpdate:12},
+  {callsign:'UAE71',  aircraft:'B77W', gate:'B21', pollsStationary:3, secsSinceUpdate:14},
+  {callsign:'AFR1147',aircraft:'A320', gate:'C31', pollsStationary:1, secsSinceUpdate:13},  // just settled -> low confidence
+  {callsign:'BAW906', aircraft:'A321', gate:'C33', pollsStationary:5, secsSinceUpdate:78},  // STALE feed entry -> discarded as ghost
+];
+
+function confidenceFor(p){
+  if(!p) return null;
+  if(p.secsSinceUpdate > 30) return null; // discarded: ghost/stale connection
+  if(p.pollsStationary >= 3) return 'High';
+  if(p.pollsStationary === 2) return 'Medium';
+  return 'Low';
+}
+
+function fetchVatsimOccupancy(){
+  const icao = document.getElementById('vatsimIcao').value.trim().toUpperCase() || 'EDDF';
+  const status = document.getElementById('vatsimStatus');
+  const btn = document.getElementById('vatsimBtn');
+  btn.disabled = true;
+  status.innerHTML = `<span class="spinner"></span> Polling data.vatsim.net/v3/vatsim-data.json (simulating 3 consecutive 15s cycles) near ${icao} ...`;
+
+  setTimeout(()=>{
+    let discardedGhosts = 0;
+    gates.forEach(g=>{
+      const raw = mockVatsimPilots.find(p=>p.gate===g.code);
+      const conf = confidenceFor(raw);
+      if(raw && !conf) discardedGhosts++;
+      const usable = !!(raw && conf);
+      g.occ = usable && (conf==='High' || conf==='Medium'); // low confidence never auto-blocks
+      g.lowConf = usable && conf==='Low';
+      g.occCallsign = usable ? raw.callsign : null;
+      g.occAircraft = usable ? raw.aircraft : null;
+      g.confidence = usable ? conf : null;
+    });
+    const occCount = gates.filter(g=>g.occ).length;
+
+    status.innerHTML = `<span class="dot green"></span> Snapshot resolved for <b>${icao}</b> — ${mockVatsimPilots.length} nearby pilots seen, ${discardedGhosts} discarded as stale/ghost, ${occCount} gate(s) confirmed occupied with sufficient confidence.`;
+    document.getElementById('vatsimIcaoLabel').textContent = icao;
+
+    const tbody = document.getElementById('vatsimTableBody');
+    tbody.innerHTML = '';
+    gates.forEach(g=>{
+      const tr = document.createElement('tr');
+      if(g.occ) tr.className='occ-row';
+      const st = g.occ ? '<span class="dot red"></span>Occupied' : (g.lowConf ? '<span class="dot" style="background:var(--accent2);"></span>Unverified' : '<span class="dot green"></span>Available');
+      const confColor = g.confidence==='High' ? 'var(--green)' : g.confidence==='Medium' ? 'var(--accent2)' : g.confidence==='Low' ? 'var(--red)' : 'var(--muted)';
+      tr.innerHTML = `<td>${g.code}</td><td>${g.size}</td><td>${st}</td><td>${g.occCallsign||'—'}</td><td>${g.occAircraft||'—'}</td><td style="color:${confColor};font-weight:bold;">${g.confidence||'—'}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('vatsimSummary').textContent =
+      `${occCount} of ${gates.length} stands confirmed occupied after filtering (${discardedGhosts} stale/ghost connection(s) excluded — e.g. BAW906, whose last_updated was 78s old). Only High/Medium confidence gates are auto-blocked in the Gate Assigner; Low-confidence gates are marked "unverified" but remain selectable.`;
+
+    document.getElementById('vatsimResultsCard').style.display='block';
+    btn.disabled = false;
+  }, 1400);
+}
+
+let selectedGate = null;
+function renderGates(){
+  const grid = document.getElementById('gateGrid');
+  const myAircraft = document.getElementById('pilotAircraft').value;
+  const myAirline = document.getElementById('pilotCallsign').value.slice(0,3);
+  const sizeClass = (myAircraft==='B77W'||myAircraft==='A359'||myAircraft==='B789') ? 'Code E' :
+                     (myAircraft==='A320') ? 'Code C' : 'Code E';
+
+  let recommended = gates.find(g => !g.occ && g.airline===myAirline && (g.size===sizeClass || g.size==='Code F'));
+  if(!recommended) recommended = gates.find(g => !g.occ && (g.size===sizeClass || g.size==='Code F'));
+
+  grid.innerHTML='';
+  gates.forEach(g=>{
+    const div = document.createElement('div');
+    const isRec = recommended && g.code===recommended.code;
+    div.className = 'gate' + (g.occ ? ' occupied':'') + (g.lowConf ? ' lowconf':'') + (isRec ? ' recommended':'');
+    div.innerHTML = `<div class="code">${g.code}</div><div class="size">${g.size}</div>` + (g.occ?`<div class="who">${g.occCallsign}</div>`:'') + (g.lowConf?`<div class="who" style="color:var(--accent2);">unverified</div>`:'');
+    if(!g.occ){
+      div.addEventListener('click',()=>{
+        document.querySelectorAll('.gate').forEach(el=>el.classList.remove('selected'));
+        div.classList.add('selected');
+        selectedGate = g;
+        let msg = `Gate ${g.code} assigned (${g.size} stand).`;
+        if(isRec) msg += ` Matches Dispatch's recommendation for ${myAirline} ${myAircraft}.`;
+        if(g.lowConf) msg += ` Note: this gate had an unverified low-confidence VATSIM sighting — double-check before use.`;
+        document.getElementById('gateResult').textContent = msg;
+        buildRelease();
+      });
+    }
+    grid.appendChild(div);
+  });
+  if(recommended && !selectedGate){
+    document.getElementById('gateResult').innerHTML = `<span class="badge rec">Recommended: ${recommended.code}</span> based on airline pier match + ${sizeClass} compatibility for ${myAircraft}.`;
+  }
+}
+
+function buildRelease(){
+  const gate = selectedGate ? selectedGate.code : '—';
+  const occCount = gates.filter(g=>g.occ).length;
+  const text = `DISPATCH RELEASE
+========================================
+FLIGHT:        ${document.getElementById('pilotCallsign').value}
+AIRCRAFT:      ${document.getElementById('pilotAircraft').value}
+ROUTE:         YSSY (Sydney) -> EDDF (Frankfurt)
+FLIGHT TIME:   14.2 hrs
+TOW / ZFW:     312.4t / 248.1t
+
+TAKEOFF (RWY 34L, YSSY)
+  V1/VR/V2:       149 / 158 / 168 kt
+  FLEX TEMP:      58 C
+  FLAPS:          5
+  LIMITING:       2nd Segment Climb
+  EO GRADIENT:    2.9% (req. 2.4%)
+  EOSID:          SYD1A - RWY hdg to 800ft,
+                  right turn 020, intercept
+                  SY VOR R-015, climb to MSA 3400ft
+
+LANDING (RWY 25C, EDDF)
+  VREF:           142 kt
+  LDA REQUIRED:   1780 m (avail 3900 m)
+  AUTOBRAKE:      2
+
+VATSIM OCCUPANCY CHECK (confidence-filtered, ghosts excluded)
+  STANDS CONFIRMED OCCUPIED: ${occCount} / ${gates.length}
+
+GATE ASSIGNMENT
+  ARRIVAL GATE:   ${gate}  (Terminal 1)
+
+STATUS: RELEASED FOR DISPATCH
+========================================`;
+  document.getElementById('releaseText').textContent = text;
+}
+</script>
+
+</body>
+</html>
