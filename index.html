@@ -14,8 +14,12 @@
   header{background:linear-gradient(90deg,#0d1420,#131a26);padding:14px 20px;border-bottom:2px solid var(--accent);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
   header h1{margin:0;font-size:18px;letter-spacing:1px;}
   header h1 span{color:var(--accent);}
+  .header-right{display:flex;align-items:center;gap:10px;}
   .countdown{font-size:12px;color:var(--muted);padding:6px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;}
   .countdown b{color:var(--accent);}
+  .admin-btn{font-size:12px;color:var(--text);background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:600;}
+  .admin-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .admin-btn.logged-in{border-color:var(--green);color:var(--green);}
   #map{position:absolute;top:56px;left:0;right:0;bottom:0;background:#a7cbe0;}
   .legend{position:absolute;bottom:20px;left:20px;background:rgba(18,24,32,0.92);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;z-index:1000;color:var(--text);}
   .legend .row{display:flex;align-items:center;gap:6px;margin:3px 0;}
@@ -33,13 +37,52 @@
   .popup-row{font-size:12px;color:#8b98a5;margin:2px 0;}
   .popup-row b{color:#e8edf2;}
   .airport-label{background:transparent;border:none;box-shadow:none;color:#0b0f14;font-weight:600;font-size:11px;text-shadow:0 0 3px #fff,0 0 3px #fff;white-space:nowrap;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(5,8,12,0.75);display:none;align-items:center;justify-content:center;z-index:5000;}
+  .modal-overlay.open{display:flex;}
+  .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:24px;width:320px;box-shadow:0 10px 40px rgba(0,0,0,0.5);}
+  .modal-box h2{margin:0 0 4px;font-size:16px;color:var(--text);}
+  .modal-box .warn{font-size:11px;color:var(--accent2);margin-bottom:16px;line-height:1.4;}
+  .modal-box label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;margin-top:12px;}
+  .modal-box input{width:100%;padding:8px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;}
+  .modal-actions{display:flex;gap:8px;margin-top:20px;}
+  .modal-actions button{flex:1;padding:9px;border-radius:6px;border:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;}
+  .btn-primary{background:var(--accent);color:#0b0f14;border-color:var(--accent);}
+  .btn-secondary{background:var(--panel2);color:var(--text);}
+  .login-error{color:var(--red);font-size:12px;margin-top:10px;display:none;}
+
+  .admin-overlay{position:fixed;inset:0;background:rgba(5,8,12,0.85);display:none;z-index:6000;overflow-y:auto;}
+  .admin-overlay.open{display:block;}
+  .admin-panel{max-width:900px;margin:40px auto;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:28px;}
+  .admin-panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .admin-panel-header h2{margin:0;font-size:20px;}
+  .admin-panel-sub{font-size:12px;color:var(--muted);margin-bottom:20px;}
+  .admin-close{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px;}
+  .admin-close:hover{border-color:var(--accent);}
+  .admin-table{width:100%;border-collapse:collapse;margin-top:8px;}
+  .admin-table th{text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;padding:8px 10px;border-bottom:1px solid var(--border);}
+  .admin-table td{padding:10px;border-bottom:1px solid var(--border);font-size:13px;}
+  .admin-table tr:hover td{background:var(--panel2);}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;}
+  .badge-green{background:rgba(63,214,138,0.15);color:var(--green);}
+  .badge-red{background:rgba(245,84,108,0.15);color:var(--red);}
+  .badge-orange{background:rgba(245,168,63,0.15);color:var(--accent2);}
+  .badge-muted{background:rgba(139,152,165,0.15);color:var(--muted);}
+  .refresh-admin{background:var(--accent);color:#0b0f14;border:none;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;}
+  .admin-summary{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;}
+  .summary-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;min-width:110px;}
+  .summary-card .num{font-size:22px;font-weight:700;}
+  .summary-card .label{font-size:11px;color:var(--muted);text-transform:uppercase;}
 </style>
 </head>
 <body>
 
 <header>
   <h1>VATSIM <span>Gate Map</span></h1>
-  <div class="countdown" id="countdown">Zoom into a mapped airport (green dot) to load gates</div>
+  <div class="header-right">
+    <div class="countdown" id="countdown">Zoom into a mapped airport (green dot) to load gates</div>
+    <button class="admin-btn" id="adminBtn">Admin Login</button>
+  </div>
 </header>
 
 <div id="map"></div>
@@ -54,6 +97,52 @@
 
 <div class="status-bar" id="statusBar">Zoom into a mapped airport to begin.</div>
 
+<!-- Admin login modal -->
+<div class="modal-overlay" id="loginOverlay">
+  <div class="modal-box">
+    <h2>Admin Login</h2>
+    <div class="warn">Note: this is a client-side check on a public static site — the credential is visible in the page source and is not real access control. Use only to gate casual access to the overview panel.</div>
+    <label for="adminUser">Username</label>
+    <input type="text" id="adminUser" autocomplete="username" />
+    <label for="adminPass">Password</label>
+    <input type="password" id="adminPass" autocomplete="current-password" />
+    <div class="login-error" id="loginError">Incorrect username or password.</div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="loginCancel">Cancel</button>
+      <button class="btn-primary" id="loginSubmit">Log In</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin overview panel -->
+<div class="admin-overlay" id="adminOverlay">
+  <div class="admin-panel">
+    <div class="admin-panel-header">
+      <h2>Fleet Overview — All Mapped Airports</h2>
+      <button class="admin-close" id="adminCloseBtn">Close</button>
+    </div>
+    <div class="admin-panel-sub">Snapshot of live VATSIM occupancy across every mapped airport, pulled from the same data feeding the map.</div>
+    <div class="admin-summary" id="adminSummary"></div>
+    <button class="refresh-admin" id="adminRefreshBtn">Refresh Snapshot</button>
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Airport</th>
+          <th>Data Source</th>
+          <th>Total Gates</th>
+          <th>Occupied</th>
+          <th>Available</th>
+          <th>Unverified</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="adminTableBody">
+        <tr><td colspan="7" style="color:var(--muted);">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const MIN_ZOOM_FOR_GATES = 12;
@@ -62,9 +151,6 @@ const GATEMAP_RETRY_DELAY_MS = 6000;
 const WORLD_VIEW_ZOOM = 2;
 const WORLD_VIEW_CENTER = [30, 10];
 
-// Airports with a fully mapped, verified gate/stand database. Shown as
-// green dots on the world overview so users know where gates are available
-// before zooming in. Add new entries here as more airports get mapped.
 const MAPPED_AIRPORTS = [
   { icao: "EDDF", name: "Frankfurt", lat: 50.0333, lon: 8.5706 },
   { icao: "YSSY", name: "Sydney", lat: -33.9461, lon: 151.1772 },
@@ -300,6 +386,149 @@ map.on('moveend zoomend', () => {
 });
 
 onMapSettled();
+
+// ---------------------------------------------------------------
+// Admin login + fleet overview panel
+// ---------------------------------------------------------------
+// NOTE: This is a client-side-only gate on a public static site. The
+// credential below ships in the page source and is visible to anyone
+// who views source or reads the GitHub repo. It is NOT real
+// authentication or access control — it only hides the overview panel
+// from casual browsing. Do not rely on this to protect sensitive data.
+const ADMIN_USERNAME = "admin";
+const ADMIN_PASSWORD = "charles1234";
+let isAdminLoggedIn = false;
+
+const adminBtn = document.getElementById('adminBtn');
+const loginOverlay = document.getElementById('loginOverlay');
+const adminOverlay = document.getElementById('adminOverlay');
+const loginError = document.getElementById('loginError');
+
+adminBtn.addEventListener('click', () => {
+  if(isAdminLoggedIn){
+    openAdminPanel();
+  } else {
+    document.getElementById('adminUser').value = '';
+    document.getElementById('adminPass').value = '';
+    loginError.style.display = 'none';
+    loginOverlay.classList.add('open');
+  }
+});
+
+document.getElementById('loginCancel').addEventListener('click', () => {
+  loginOverlay.classList.remove('open');
+});
+
+document.getElementById('loginSubmit').addEventListener('click', attemptLogin);
+document.getElementById('adminPass').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') attemptLogin();
+});
+
+function attemptLogin(){
+  const user = document.getElementById('adminUser').value.trim();
+  const pass = document.getElementById('adminPass').value;
+  if(user === ADMIN_USERNAME && pass === ADMIN_PASSWORD){
+    isAdminLoggedIn = true;
+    adminBtn.textContent = 'Admin: Overview';
+    adminBtn.classList.add('logged-in');
+    loginOverlay.classList.remove('open');
+    openAdminPanel();
+  } else {
+    loginError.style.display = 'block';
+  }
+}
+
+document.getElementById('adminCloseBtn').addEventListener('click', () => {
+  adminOverlay.classList.remove('open');
+});
+
+document.getElementById('adminRefreshBtn').addEventListener('click', () => {
+  loadAdminOverview();
+});
+
+function openAdminPanel(){
+  adminOverlay.classList.add('open');
+  loadAdminOverview();
+}
+
+async function fetchAirportSnapshot(ap){
+  try{
+    const gmRes = await fetch(`/api/gatemap?lat=${ap.lat}&lon=${ap.lon}`);
+    const gmData = await gmRes.json();
+    if(gmData.error || !gmData.gates || gmData.gates.length === 0){
+      return { ap, error: gmData.error || 'No gates returned', gates: [] };
+    }
+    const occRes = await fetch('/api/occupancy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: ap.lat, lon: ap.lon, gates: gmData.gates })
+    });
+    const occData = await occRes.json();
+    if(occData.error){
+      return { ap, error: occData.error, gates: gmData.gates, source: gmData.gates[0]?.source };
+    }
+    return { ap, gates: occData.gates, source: gmData.gates[0]?.source };
+  } catch(err){
+    return { ap, error: err.message, gates: [] };
+  }
+}
+
+function sourceBadge(source){
+  if(source === 'chart') return '<span class="badge badge-green">chart</span>';
+  if(source === 'chart_partial') return '<span class="badge badge-orange">chart (partial)</span>';
+  if(source === 'community') return '<span class="badge badge-orange">community</span>';
+  return '<span class="badge badge-muted">osm</span>';
+}
+
+async function loadAdminOverview(){
+  const tbody = document.getElementById('adminTableBody');
+  const summary = document.getElementById('adminSummary');
+  tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted);"><span class="spinner"></span>Pulling live snapshot from all ${MAPPED_AIRPORTS.length} airports...</td></tr>`;
+  summary.innerHTML = '';
+
+  const results = await Promise.all(MAPPED_AIRPORTS.map(fetchAirportSnapshot));
+
+  let totalGates = 0, totalOccupied = 0, totalAvailable = 0, totalUnverified = 0, errorCount = 0;
+
+  const rows = results.map(r => {
+    if(r.error){
+      errorCount++;
+      return `<tr>
+        <td><b>${r.ap.icao}</b> — ${r.ap.name}</td>
+        <td>—</td>
+        <td colspan="4" style="color:var(--red);">${r.error}</td>
+        <td><span class="badge badge-red">Error</span></td>
+      </tr>`;
+    }
+    const occupied = r.gates.filter(g => g.status === 'occupied').length;
+    const unverified = r.gates.filter(g => g.status === 'unverified').length;
+    const available = r.gates.length - occupied - unverified;
+    totalGates += r.gates.length;
+    totalOccupied += occupied;
+    totalUnverified += unverified;
+    totalAvailable += available;
+    return `<tr>
+      <td><b>${r.ap.icao}</b> — ${r.ap.name}</td>
+      <td>${sourceBadge(r.source)}</td>
+      <td>${r.gates.length}</td>
+      <td><span class="badge badge-red">${occupied}</span></td>
+      <td><span class="badge badge-green">${available}</span></td>
+      <td>${unverified > 0 ? `<span class="badge badge-orange">${unverified}</span>` : '0'}</td>
+      <td><span class="badge badge-green">OK</span></td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = rows.join('');
+
+  summary.innerHTML = `
+    <div class="summary-card"><div class="num">${MAPPED_AIRPORTS.length}</div><div class="label">Airports Mapped</div></div>
+    <div class="summary-card"><div class="num">${totalGates}</div><div class="label">Total Gates</div></div>
+    <div class="summary-card" style="color:var(--red);"><div class="num">${totalOccupied}</div><div class="label">Occupied</div></div>
+    <div class="summary-card" style="color:var(--green);"><div class="num">${totalAvailable}</div><div class="label">Available</div></div>
+    <div class="summary-card" style="color:var(--accent2);"><div class="num">${totalUnverified}</div><div class="label">Unverified</div></div>
+    ${errorCount > 0 ? `<div class="summary-card" style="color:var(--red);"><div class="num">${errorCount}</div><div class="label">Errors</div></div>` : ''}
+  `;
+}
 </script>
 
 </body>
