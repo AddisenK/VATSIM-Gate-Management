@@ -77,7 +77,12 @@ let currentCenter = null;
 let gatemapRetryTimer = null;
 
 function cacheKey(lat, lon){
-  return `${Math.round(lat*200)/200},${Math.round(lon*200)/200}`;
+  // Widened to ~0.02 deg (~2km) buckets so zooming in/out around the same
+  // airport reuses the cached gate map instead of re-triggering an Overpass
+  // fetch on every zoom — the map center shifts slightly on each zoom step,
+  // which was previously generating a new cache key (and a fresh, sometimes
+  // flaky Overpass request) on nearly every interaction.
+  return `${Math.round(lat*50)/50},${Math.round(lon*50)/50}`;
 }
 
 function colorFor(status){
